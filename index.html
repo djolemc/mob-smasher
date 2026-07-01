@@ -175,6 +175,10 @@ const SPAWN_END_FACTOR = 0.35; // pred kraj razmaci izmedju mobova = 35% pocetni
 const LIFE_END_FACTOR  = 0.5;  // pred kraj mobovi ostaju upola krace
 const MAX_BURST        = 4;    // pred kraj se pojavljuje do ovoliko mobova odjednom
 const STEVE_EXTRA_WEIGHT = 6;  // koliko se Steve-u povecava sansa do kraja igre (0 = nikako)
+
+// Nasumicno okretanje u ogledalu (levo-desno). 0 = nikad, 1 = uvek, 0.5 = pola-pola.
+// Okrece samo horizontalno (kao odraz u ogledalu), NE naopako niti rotirano.
+const MIRROR_CHANCE = 0.5;
 /* ========================================================================= */
 
 const game = document.getElementById("game");
@@ -270,6 +274,9 @@ function spawnOne() {
   el.style.width = size + "px";
   el.style.height = size + "px";
 
+  // nasumicno okretanje u ogledalu (samo levo-desno)
+  const flip = Math.random() < MIRROR_CHANCE ? " scaleX(-1)" : "";
+
   // pozicija (izbegava HUD na vrhu)
   const maxX = game.clientWidth - size;
   const maxY = game.clientHeight - size;
@@ -280,11 +287,13 @@ function spawnOne() {
   const img = document.createElement("img");
   img.src = mob.img;
   img.alt = mob.name;
+  img.style.transform = flip;
   img.onerror = () => {
     img.remove();
     const fb = document.createElement("div");
     fb.className = "fallback";
     fb.style.background = mob.color;
+    fb.style.transform = flip;
     fb.innerHTML = `<span class="emoji">${mob.emoji}</span><span>${mob.name}</span>`;
     el.appendChild(fb);
   };
