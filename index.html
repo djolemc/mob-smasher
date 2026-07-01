@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Mob Smasher</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6ab04c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="images/icon-192.png">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+  html, body { height: 100%; overflow: hidden; font-family: "Segoe UI", Tahoma, sans-serif; }
+
+  #game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(#7ec0ee 0%, #7ec0ee 55%, #6ab04c 55%, #4c8c2b 100%);
+    touch-action: none;
+    overflow: hidden;
+  }
+
+  /* HUD */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px;
+    font-size: clamp(18px, 4vw, 30px);
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 2px 2px 0 #000;
+    z-index: 10;
+    pointer-events: none;
+  }
+  #timer.low { color: #ff5252; }
+  .hud-right { display: flex; align-items: center; gap: 12px; }
+  #quitBtn {
+    pointer-events: auto;
+    width: 44px; height: 44px;
+    font-size: 22px; font-weight: bold;
+    color: #fff; background: rgba(200,40,40,0.85);
+    border: 3px solid #000; border-radius: 10px;
+    cursor: pointer; line-height: 1;
+    text-shadow: 1px 1px 0 #000;
+    touch-action: manipulation;
+  }
+  #quitBtn:active { transform: translateY(2px); }
+
+  /* Mob */
+  .mob {
+    position: absolute;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+    animation: pop 0.18s ease-out;
+    will-change: transform;
+  }
+  .mob img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .mob .fallback {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 12px;
+    font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000;
+    font-size: 14px; line-height: 1.1; text-align: center;
+  }
+  .mob .fallback .emoji { font-size: 2.2em; }
+  @keyframes pop { from { transform: scale(0.2); } to { transform: scale(1); } }
+
+  .hit { animation: hit 0.25s forwards; }
+  @keyframes hit { to { transform: scale(1.6); opacity: 0; } }
+
+  /* Floating score text */
+  .float {
+    position: absolute;
+    font-weight: bold; font-size: 26px;
+    text-shadow: 2px 2px 0 #000;
+    pointer-events: none;
+    animation: floatUp 0.7s forwards;
+    z-index: 20;
+  }
+  @keyframes floatUp { to { transform: translateY(-50px); opacity: 0; } }
+
+  /* Overlays */
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.7);
+    color: #fff; text-align: center;
+    z-index: 50;
+    padding: 20px;
+  }
+  #logo { width: min(70vw, 340px); height: auto; margin-bottom: 18px; image-rendering: auto; }
+  .overlay h1 { font-size: clamp(28px, 8vw, 56px); margin-bottom: 10px; text-shadow: 3px 3px 0 #000; }
+  .overlay p { font-size: clamp(16px, 4vw, 22px); margin-bottom: 24px; max-width: 500px; line-height: 1.5; }
+  .btn {
+    padding: 16px 40px; font-size: clamp(18px, 5vw, 26px); font-weight: bold;
+    background: #6ab04c; color: #fff; border: 4px solid #2f5c1a; border-radius: 10px;
+    cursor: pointer; text-shadow: 2px 2px 0 #000;
+  }
+  .btn:active { transform: translateY(2px); }
+  .hidden { display: none !important; }
+  #finalScore { font-size: clamp(30px, 9vw, 60px); color: #ffd54f; margin: 10px 0 20px; }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="hud">
+    <div id="score">Poeni: 0</div>
+    <div id="timer">60</div>
+    <div class="hud-right">
+      <div id="best">Rekord: 0</div>
+      <button id="quitBtn" title="Prekini (Esc)">✕</button>
+    </div>
+  </div>
+
+  <!-- Start screen -->
+  <div id="startScreen" class="overlay">
+    <img src="images/logo.png" alt="Logo" id="logo" onerror="this.style.display='none'">
+    <h1>Mob Smasher</h1>
+    <p>Klikni ili dodirni čudovišta da ih uništiš!<br>
+       <b>NE diraj Steve-a</b> — oduzima poene.<br>
+       Imaš 60 sekundi. Srećno!</p>
+    <button class="btn" id="startBtn">POKRENI</button>
+  </div>
+
+  <!-- Game over screen -->
+  <div id="overScreen" class="overlay hidden">
+    <h1>Kraj igre!</h1>
+    <div id="finalScore">0</div>
+    <p id="recordMsg" style="color:#ffd54f; font-weight:bold; min-height:1.5em;"></p>
+    <button class="btn" id="restartBtn">IGRAJ PONOVO</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   PODESAVANJA - ovde menjaj sve po zelji
+   ========================================================================= */
+const GAME_TIME = 60;          // trajanje igre u sekundama
+
+// Likovi. "img" je putanja do slike - zameni je svojim PNG-om (folder images/).
+// Ako slika ne postoji, prikazuje se rezervni emoji + ime.
+// "points" = koliko poena nosi. Steve ima negativne (kazna).
+const MOBS = [
+  { name: "Creeper",      img: "images/creeper.png",     emoji: "🟩", color: "#4c8c2b", points: 10 },
+  { name: "Zombie",       img: "images/zombie.png",      emoji: "🧟", color: "#5c8a3a", points: 10 },
+  { name: "Skeleton",     img: "images/skeleton.png",    emoji: "💀", color: "#cfcfcf", points: 12 },
+  { name: "Enderman",     img: "images/enderman.png",    emoji: "🟪", color: "#2b2b3c", points: 15 },
+  { name: "Pig",          img: "images/pig.png",         emoji: "🐷", color: "#e28f9b", points: 8  },
+  { name: "Fox",          img: "images/fox.png",         emoji: "🦊", color: "#d98736", points: 8  },
+  { name: "Jockey",       img: "images/jockey.png",      emoji: "🕷️", color: "#3a2b3c", points: 18 },
+  { name: "Ender Dragon", img: "images/ender-dragon.png",emoji: "🐉", color: "#1a1a2c", points: 25 },
+  { name: "Steve",        img: "images/steve.png",       emoji: "🧑", color: "#8a5a3a", points: -15 }, // NE DIRAJ
+];
+
+// Sanse pojavljivanja (relativna tezina). Steve i jaci mobovi su redji.
+// Redom kao MOBS: Creeper, Zombie, Skeleton, Enderman, Pig, Fox, Jockey, Ender Dragon, Steve
+const SPAWN_WEIGHTS = [3, 3, 2, 2, 2, 2, 1, 1, 2];
+
+const SPAWN_MIN = 400;   // najkraci razmak izmedju pojavljivanja (ms)
+const SPAWN_MAX = 1100;  // najduzi razmak (ms)
+const LIFE_MIN  = 600;   // najkrace koliko lik ostaje na ekranu (ms)
+const LIFE_MAX  = 3200;  // najduze (ms) - siri raspon = vise variranja
+const SIZE_MIN  = 45;    // najmanja velicina (px)
+const SIZE_MAX  = 140;   // najveca velicina (px)
+
+// Manja ikonica = vise poena. Najmanja nosi do SIZE_SCORE_MULT puta vise.
+const SIZE_SCORE_MULT = 3;
+
+// Ubrzavanje kroz vreme: na kraju igre razmaci/trajanje padaju na ovaj procenat.
+const SPAWN_END_FACTOR = 0.35; // pred kraj razmaci izmedju mobova = 35% pocetnih
+const LIFE_END_FACTOR  = 0.5;  // pred kraj mobovi ostaju upola krace
+const MAX_BURST        = 4;    // pred kraj se pojavljuje do ovoliko mobova odjednom
+const STEVE_EXTRA_WEIGHT = 6;  // koliko se Steve-u povecava sansa do kraja igre (0 = nikako)
+/* ========================================================================= */
+
+const game = document.getElementById("game");
+const scoreEl = document.getElementById("score");
+const timerEl = document.getElementById("timer");
+const bestEl = document.getElementById("best");
+const startScreen = document.getElementById("startScreen");
+const overScreen = document.getElementById("overScreen");
+const finalScoreEl = document.getElementById("finalScore");
+const recordMsgEl = document.getElementById("recordMsg");
+
+let score = 0;
+let timeLeft = GAME_TIME;
+let running = false;
+let spawnTimer = null;
+let countdownTimer = null;
+let bestScore = parseInt(localStorage.getItem("mobSmasherBest") || "0", 10);
+bestEl.textContent = "Rekord: " + bestScore;
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+
+// 0 na pocetku igre, 1 na kraju - koristi se za ubrzavanje
+function progress() { return (GAME_TIME - timeLeft) / GAME_TIME; }
+function lerpFactor(endFactor) { return 1 - progress() * (1 - endFactor); }
+
+/* Zvuk preko Web Audio API - ne treba nikakav fajl */
+let audioCtx = null;
+// Otkljucava zvuk - mora unutar korisnickog klika (browseri blokiraju autoplay)
+function initAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) { /* browser ne podrzava zvuk */ }
+}
+function playBeep(freq, duration, type = "square", gain = 0.15) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(gain, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) { /* ignorisi ako browser ne dozvoljava zvuk */ }
+}
+function playHit()   { playBeep(660, 0.12, "square"); setTimeout(() => playBeep(880, 0.10, "square"), 60); }
+function playWrong() { playBeep(160, 0.30, "sawtooth", 0.2); }
+function playEnd()   { playBeep(520, 0.15, "triangle"); setTimeout(() => playBeep(392, 0.25, "triangle"), 150); }
+
+function weightedMob() {
+  // Steve (negativni poeni) postaje sve cesci kako vreme istice
+  const p = progress();
+  const weights = SPAWN_WEIGHTS.map((w, i) =>
+    MOBS[i].points < 0 ? w + p * STEVE_EXTRA_WEIGHT : w
+  );
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < MOBS.length; i++) {
+    if (r < weights[i]) return MOBS[i];
+    r -= weights[i];
+  }
+  return MOBS[0];
+}
+
+function showFloat(x, y, text, color) {
+  const f = document.createElement("div");
+  f.className = "float";
+  f.textContent = text;
+  f.style.color = color;
+  f.style.left = x + "px";
+  f.style.top = y + "px";
+  game.appendChild(f);
+  setTimeout(() => f.remove(), 700);
+}
+
+function spawnOne() {
+  const mob = weightedMob();
+  const size = rand(SIZE_MIN, SIZE_MAX);
+  const life = rand(LIFE_MIN, LIFE_MAX) * lerpFactor(LIFE_END_FACTOR);
+
+  // manja ikonica -> veci mnozilac poena (1x za najvecu, do SIZE_SCORE_MULT za najmanju)
+  const norm = (size - SIZE_MIN) / (SIZE_MAX - SIZE_MIN); // 0 = najmanja, 1 = najveca
+  const mult = 1 + (1 - norm) * (SIZE_SCORE_MULT - 1);
+  const pts = Math.round(mob.points * mult);
+
+  const el = document.createElement("div");
+  el.className = "mob";
+  el.style.width = size + "px";
+  el.style.height = size + "px";
+
+  // pozicija (izbegava HUD na vrhu)
+  const maxX = game.clientWidth - size;
+  const maxY = game.clientHeight - size;
+  el.style.left = rand(0, Math.max(0, maxX)) + "px";
+  el.style.top = rand(70, Math.max(70, maxY)) + "px";
+
+  // slika sa rezervnim emoji prikazom ako slike nema
+  const img = document.createElement("img");
+  img.src = mob.img;
+  img.alt = mob.name;
+  img.onerror = () => {
+    img.remove();
+    const fb = document.createElement("div");
+    fb.className = "fallback";
+    fb.style.background = mob.color;
+    fb.innerHTML = `<span class="emoji">${mob.emoji}</span><span>${mob.name}</span>`;
+    el.appendChild(fb);
+  };
+  el.appendChild(img);
+
+  let alive = true;
+  const removeMob = () => { if (el.parentNode) el.remove(); };
+
+  const lifeTimeout = setTimeout(() => { alive = false; removeMob(); }, life);
+
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (!alive || !running) return;
+    alive = false;
+    clearTimeout(lifeTimeout);
+
+    score += pts;
+    if (score < 0) score = 0;
+    scoreEl.textContent = "Poeni: " + score;
+
+    if (pts >= 0) playHit(); else playWrong();
+
+    const sign = pts >= 0 ? "+" : "";
+    showFloat(e.clientX - 15, e.clientY - 20, sign + pts,
+              pts >= 0 ? "#ffd54f" : "#ff5252");
+
+    el.classList.add("hit");
+    setTimeout(removeMob, 250);
+  });
+
+  game.appendChild(el);
+}
+
+function spawnLoop() {
+  if (!running) return;
+
+  // pred kraj se pojavljuje vise mobova odjednom
+  const maxNow = 1 + progress() * (MAX_BURST - 1);
+  const count = Math.max(1, Math.round(rand(1, maxNow)));
+  for (let i = 0; i < count; i++) spawnOne();
+
+  // zakazi sledeci talas (razmak se skracuje kako vreme istice)
+  spawnTimer = setTimeout(spawnLoop, rand(SPAWN_MIN, SPAWN_MAX) * lerpFactor(SPAWN_END_FACTOR));
+}
+
+function tick() {
+  timeLeft--;
+  timerEl.textContent = timeLeft;
+  if (timeLeft <= 10) timerEl.classList.add("low");
+  if (timeLeft <= 0) endGame();
+}
+
+function startGame() {
+  initAudio(); // otkljucaj zvuk unutar korisnickog klika
+  score = 0;
+  timeLeft = GAME_TIME;
+  running = true;
+  scoreEl.textContent = "Poeni: 0";
+  timerEl.textContent = timeLeft;
+  timerEl.classList.remove("low");
+
+  startScreen.classList.add("hidden");
+  overScreen.classList.add("hidden");
+
+  spawnLoop();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+function endGame() {
+  running = false;
+  clearTimeout(spawnTimer);
+  clearInterval(countdownTimer);
+  document.querySelectorAll(".mob").forEach(m => m.remove());
+  playEnd();
+
+  let recordMsg = "";
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem("mobSmasherBest", String(bestScore));
+    bestEl.textContent = "Rekord: " + bestScore;
+    recordMsg = "🏆 NOVI REKORD!";
+  }
+
+  finalScoreEl.textContent = score + " poena";
+  recordMsgEl.textContent = recordMsg;
+  overScreen.classList.remove("hidden");
+}
+
+document.getElementById("startBtn").addEventListener("click", startGame);
+document.getElementById("restartBtn").addEventListener("click", startGame);
+
+// Prekid igre: Esc na tastaturi ili ✕ dugme (za tablet/touch)
+document.getElementById("quitBtn").addEventListener("click", () => { if (running) endGame(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && running) endGame();
+});
+
+// Registruj service worker za offline rad (radi samo preko http/https, ne file://)
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => { /* offline mod nedostupan */ });
+  });
+}
+</script>
+</body>
+</html>

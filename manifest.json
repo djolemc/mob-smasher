@@ -1,0 +1,16 @@
+{
+  "name": "Mob Smasher",
+  "short_name": "Mob Smasher",
+  "description": "Minecraft mob whack-a-mole igra",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#7ec0ee",
+  "theme_color": "#6ab04c",
+  "icons": [
+    { "src": "images/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
